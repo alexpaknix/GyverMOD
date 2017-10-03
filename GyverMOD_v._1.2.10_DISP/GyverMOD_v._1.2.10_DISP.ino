@@ -4,24 +4,24 @@
   ВНИМАНИЕ! ПУТЬ К ПАПКЕ СО СКЕТЧЕМ НЕ ДОЛЖЕН СОДЕРЖАТЬ РУССКИХ СИМВОЛОВ
   ВО ИЗБЕЖАНИЕ ПРОБЛЕМ ПОЛОЖИТЕ ПАПКУ В КОРЕНЬ ДИСКА С
 
-  Внимание! При первом запуске initial_calibration должен быть равен 1 (строка №17)
+  Внимание! При первом запуске Stg_initial_fn_calibration должен быть равен 1 (строка №17)
   При подключении и открытии монитора порта будет запущен процесс калибровки.
   Вам нужно при помощи вольтметра измерить напряжение на пинах 5V и GND,
   затем отправить его в монитор В МИЛЛИВОЛЬТАХ, т.е. если на вольтметре 4.56
-  то отправить примерно 4560. После этого изменить initial_calibration на 0
+  то отправить примерно 4560. После этого изменить Stg_initial_fn_calibration на 0
   и заново прошить Arduino.
   Если хотите пропустить процесс калибровки, то введите то же самое напряжение,
   что было показано вам при калибровке (real VCC). И снова прошейте код.
 */
 //-----------------------------------НАСТРОЙКИ------------------------------------
-#define initial_calibration 0  // калибровка вольтметра 1 - включить, 0 - выключить
-#define welcome 0              // приветствие (слова GYVER VAPE при включении), 1 - включить, 0 - выключить
-#define battery_info 0         // отображение напряжения аккумулятора при запуске, 1 - включить, 0 - выключить
-#define sleep_timer 10         // таймер сна в секундах
-#define vape_threshold 4       // отсечка затяжки, в секундах
-#define turbo_mode 0           // турбо режим 1 - включить, 0 - выключить
-#define battery_percent 0      // отображать заряд в процентах, 1 - включить, 0 - выключить
-#define battery_low 2.8        // нижний порог срабатывания защиты от переразрядки аккумулятора, в Вольтах!
+#define Stg_initial_fn_calibration 0  // калибровка вольтметра 1 - включить, 0 - выключить
+#define Stg_welcome 0              // приветствие (слова GYVER VAPE при включении), 1 - включить, 0 - выключить
+#define Stg_battery_info 0         // отображение напряжения аккумулятора при запуске, 1 - включить, 0 - выключить
+#define Stg_sleep_timer 10         // таймер сна в секундах
+#define Stg_vape_threshold 4       // отсечка затяжки, в секундах
+#define Stg_turbo_mode 0           // турбо режим 1 - включить, 0 - выключить
+#define Stg_battery_percent 0      // отображать заряд в процентах, 1 - включить, 0 - выключить
+#define Stg_battery_low 2.8        // нижний порог срабатывания защиты от переразрядки аккумулятора, в Вольтах!
 //-----------------------------------НАСТРОЙКИ------------------------------------
 
 #include <EEPROMex.h>   // библиотека для работы со внутренней памятью ардуино
@@ -59,8 +59,8 @@ TM74HC595Display disp(SCLK, RCLK, DIO);
 unsigned char SYM[47];
 //-----------дисплей-----------
 
-int bat_vol, bat_volt_f;   // хранит напряжение на акуме
-int PWM, PWM_f;           // хранит PWM сигнал
+int bat_vol, bat_volt_f; // хранит напряжение на акуме
+int PWM, PWM_f; // хранит PWM сигнал
 
 //-------переменные и коэффициенты для фильтра-------
 int bat_old, PWM_old = 800;
@@ -96,7 +96,7 @@ byte E[4] = {36, 20, 33, 24};
 
 void setup() {
   Serial.begin(9600);
-  if (initial_calibration) calibration();  // калибровка, если разрешена
+  if (Stg_initial_fn_calibration) fn_calibration();  // калибровка, если разрешена
 
   //----читаем из памяти-----
   volts = EEPROM.readInt(0);
@@ -105,9 +105,9 @@ void setup() {
   my_vcc_const = EEPROM.readFloat(8);
   //----читаем из памяти-----
 
-  symbols(); // инициализировать символы для дисплея
+  fn_symbols(); // инициализировать символы для дисплея
   Timer1.initialize(1500);          // таймер
-  Timer1.attachInterrupt(timerIsr);
+  Timer1.attachInterrupt(fn_timerIsr);
 
   //---настройка кнопок и выходов-----
   pinMode(butt_up , INPUT_PULLUP);
@@ -122,34 +122,34 @@ void setup() {
   //---настройка кнопок и выходов-----
 
   //------приветствие-----
-  if (welcome) {
-    disp_send(GYVE);
+  if (Stg_welcome) {
+    fn_disp_send(GYVE);
     delay(400);
-    disp_send(YVEA);
+    fn_disp_send(YVEA);
     delay(400);
-    disp_send(VAPE);
+    fn_disp_send(VAPE);
     delay(400);
   }
   //------приветствие-----
 
   // измерить напряжение аккумулятора
-  bat_vol = readVcc();
+  bat_vol = fn_readVcc();
   bat_old = bat_vol;
 
   // проверка заряда акума, если разряжен то прекратить работу
-  if (bat_vol < battery_low * 1000) {
-    flag = 0;
+  if (bat_vol < Stg_battery_low * 1000) {
+    flag = false;
     disp.clear();
-    disp_send(LOWB);
+    fn_disp_send(LOWB);
     Timer1.disablePwm(mosfet);    // принудительно отключить койл
     digitalWrite(mosfet, LOW);    // принудительно отключить койл
   } else {
-    flag = 1;
+    flag = true;
   }
 
-  if (battery_info) {  // отобразить заряд аккумулятора при первом включении
+  if (Stg_battery_info) {  // отобразить заряд аккумулятора при первом включении
     disp.clear();
-    disp_send(BVOL);
+    fn_disp_send(BVOL);
     delay(500);
     disp.float_dot((float)bat_vol / 1000, 2);
     delay(1000);
@@ -160,13 +160,13 @@ void setup() {
 void loop() {
   if (millis() - last_time > 50) {                       // 20 раз в секунду измеряем напряжение
     last_time = millis();
-    bat_vol = readVcc();                                 // измерить напряжение аккумулятора в миллиВольтах
+    bat_vol = fn_readVcc();                                 // измерить напряжение аккумулятора в миллиВольтах
     bat_volt_f = filter_k * bat_vol + (1 - filter_k) * bat_old;  // фильтруем
     bat_old = bat_volt_f;                                // фильтруем
-    if (bat_volt_f < battery_low * 1000) {               // если напряжение меньше минимального
-      flag = 0;                                          // прекратить работу
+    if (bat_volt_f < Stg_battery_low * 1000) {               // если напряжение меньше минимального
+      flag = false;                                          // прекратить работу
       disp.clear();
-      disp_send(LOWB);
+      fn_disp_send(LOWB);
       Timer1.disablePwm(mosfet);    // принудительно отключить койл
       digitalWrite(mosfet, LOW);    // принудительно отключить койл
     }
@@ -182,19 +182,19 @@ void loop() {
   if (up_state || down_state || set_state || vape_state) wake_timer = millis();
   //-----------опрос кнопок-----------
 
-  // service_mode();  // раскомментировать для отладки кнопок
+  // fn_service_mode();  // раскомментировать для отладки кнопок
   // показывает, какие кнопки нажаты или отпущены
   // использовать для проерки правильности подключения
 
   //---------------------отработка нажатия SET и изменение режимов---------------------
   if (flag) {                              // если акум заряжен
     if (set_state && !set_hold) {          // если кнпока нажата
-      set_hold = 1;
+      set_hold = true;
       set_press = millis();                // начинаем отсчёт
       while (millis() - set_press < 300) {
         if (digitalRead(butt_set)) {       // если кнопка отпущена до 300 мс
-          set_hold = 0;
-          set_flag = 1;
+          set_hold = false;
+          set_flag = true;
           break;
         }
       }
@@ -202,25 +202,25 @@ void loop() {
     if (set_hold && set_state) {           // если кнопка всё ещё удерживается
       if (!set_flag_hold) {
         disp.clear();
-        set_flag_hold = 1;
+        set_flag_hold = true;
       }
       if (round(millis() / 150) % 2 == 0) {
-        if (!battery_percent) {
+        if (!Stg_battery_percent) {
           disp.float_dot((float)bat_volt_f / 1000, 2); // показать заряд акума в вольтах
         } else {
-          disp.digit4(map(bat_volt_f, battery_low * 1000, 4200, 0, 99)); // показать заряд акума в процентах
+          disp.digit4(map(bat_volt_f, Stg_battery_low * 1000, 4200, 0, 99)); // показать заряд акума в процентах
         }
       }
     }
     if (set_hold && !set_state && set_flag_hold) {  // если удерживалась и была отпущена
-      set_hold = 0;
-      set_flag_hold = 0;
+      set_hold = false;
+      set_flag_hold = false;
       mode_flag = 1;
     }
 
     if (!set_state && set_flag) {  // если нажали-отпустили
-      set_hold = 0;
-      set_flag = 0;
+      set_hold = false;
+      set_flag = false;
       mode++;                      // сменить режим
       mode_flag = 1;
       if (mode > 2) mode = 0;      // ограничение на 3 режима
@@ -231,7 +231,7 @@ void loop() {
     if (mode == 0 && !vape_state && !set_hold) {
       if (mode_flag) {                     // приветствие
         mode_flag = 0;
-        disp_send(VVOL);
+        fn_disp_send(VVOL);
         delay(400);
         disp.clear();
       }
@@ -239,12 +239,12 @@ void loop() {
       if (up_state && !up_flag) {
         volts += 100;
         volts = min(volts, bat_volt_f);  // ограничение сверху на текущий заряд акума
-        up_flag = 1;
+        up_flag = true;
         disp.clear();
       }
       if (!up_state && up_flag) {
-        up_flag = 0;
-        change_v_flag = 1;
+        up_flag = false;
+        change_v_flag = true;
       }
       //---------кнопка ВВЕРХ--------
 
@@ -252,12 +252,12 @@ void loop() {
       if (down_state && !down_flag) {
         volts -= 100;
         volts = max(volts, 0);
-        down_flag = 1;
+        down_flag = true;
         disp.clear();
       }
       if (!down_state && down_flag) {
-        down_flag = 0;
-        change_v_flag = 1;
+        down_flag = false;
+        change_v_flag = true;
       }
       //---------кнопка ВНИЗ--------
       disp.float_dot((float)volts / 1000, 2); // отобразить на дисплее
@@ -269,7 +269,7 @@ void loop() {
     if (mode == 1 && !vape_state && !set_hold) {
       if (mode_flag) {                     // приветствие
         mode_flag = 0;
-        disp_send(VAVA);
+        fn_disp_send(VAVA);
         delay(400);
         disp.clear();
       }
@@ -278,12 +278,12 @@ void loop() {
         watts += 1;
         byte maxW = (sq((float)bat_volt_f / 1000)) / ohms;
         watts = min(watts, maxW);               // ограничение сверху на текущий заряд акума и сопротивление
-        up_flag = 1;
+        up_flag = true;
         disp.clear();
       }
       if (!up_state && up_flag) {
-        up_flag = 0;
-        change_w_flag = 1;
+        up_flag = false;
+        change_w_flag = true;
       }
       //---------кнопка ВВЕРХ--------
 
@@ -291,12 +291,12 @@ void loop() {
       if (down_state && !down_flag) {
         watts -= 1;
         watts = max(watts, 0);
-        down_flag = 1;
+        down_flag = true;
         disp.clear();
       }
       if (!down_state && down_flag) {
-        down_flag = 0;
-        change_w_flag = 1;
+        down_flag = false;
+        change_w_flag = true;
       }
       //---------кнопка ВНИЗ--------
       disp.digit4(watts);        // отобразить на дисплее
@@ -307,7 +307,7 @@ void loop() {
     if (mode == 2 && !vape_state && !set_hold) {
       if (mode_flag) {                     // приветствие
         mode_flag = 0;
-        disp_send(COIL);
+        fn_disp_send(COIL);
         delay(400);
         disp.clear();
       }
@@ -315,12 +315,12 @@ void loop() {
       if (up_state && !up_flag) {
         ohms += 0.05;
         ohms = min(ohms, 3);
-        up_flag = 1;
+        up_flag = true;
         disp.clear();
       }
       if (!up_state && up_flag) {
-        up_flag = 0;
-        change_o_flag = 1;
+        up_flag = false;
+        change_o_flag = true;
       }
       //---------кнопка ВВЕРХ--------
 
@@ -332,8 +332,8 @@ void loop() {
         disp.clear();
       }
       if (!down_state && down_flag) {
-        down_flag = 0;
-        change_o_flag = 1;
+        down_flag = false;
+        change_o_flag = true;
       }
       //---------кнопка ВНИЗ--------
       disp.float_dot(ohms, 2);        // отобразить на дисплее
@@ -358,14 +358,14 @@ void loop() {
         vape_mode = 3;               // тройное нажатие
       }
 
-      if (millis() - vape_press > vape_threshold * 1000) {  // "таймер затяжки"
+      if (millis() - vape_press > Stg_vape_threshold * 1000) {  // "таймер затяжки"
         vape_mode = 0;
         digitalWrite(mosfet, 0);
       }
 
       if (vape_mode == 1) {                                           // обычный режим парения
         if (round(millis() / 150) % 2 == 0)
-          disp_send(vape1); else disp_send(vape2);                    // мигать медленно
+          fn_disp_send(vape1); else fn_disp_send(vape2);                    // мигать медленно
         if (mode == 0) {                                              // если ВАРИВОЛЬТ
           PWM = (float)volts / bat_volt_f * 1024;                     // считаем значение для ШИМ сигнала
           if (PWM > 1023) PWM = 1023;                                 // ограничил PWM "по тупому", потому что constrain сука не работает!
@@ -374,18 +374,18 @@ void loop() {
         }
         Timer1.pwm(mosfet, PWM_f);                                    // управление мосфетом
       }
-      if (vape_mode == 2 && turbo_mode) {                             // турбо режим парения (если включен)
+      if (vape_mode == 2 && Stg_turbo_mode) {                             // турбо режим парения (если включен)
         if (round(millis() / 50) % 2 == 0)
-          disp_send(vape1); else disp_send(vape2);                    // мигать быстро
+          fn_disp_send(vape1); else fn_disp_send(vape2);                    // мигать быстро
         digitalWrite(mosfet, 1);                                      // херачить на полную мощность
       }
       if (vape_mode == 3) {                                           // тройное нажатие
         vape_release_count = 0;
         vape_mode = 1;
         vape_flag = 0;
-        good_night();    // вызвать функцию сна
+        fn_good_night();    // вызвать функцию сна
       }
-      vape_btt = 1;
+      vape_btt = true;
     }
 
     if (!vape_state && vape_btt) {  // если кнопка ПАРИТЬ отпущена
@@ -394,7 +394,7 @@ void loop() {
         vape_mode = 0;
         vape_flag = 0;
       }
-      vape_btt = 0;
+      vape_btt = false;
       if (vape_mode == 1) {
         vape_release_count = 1;
         vape_press = millis();
@@ -408,36 +408,36 @@ void loop() {
       // если есть изменения в настройках, записать в память
       if (change_v_flag) {
         EEPROM.writeInt(0, volts);
-        change_v_flag = 0;
+        change_v_flag = false;
       }
       if (change_w_flag) {
         EEPROM.writeInt(2, watts);
-        change_w_flag = 0;
+        change_w_flag = false;
       }
       if (change_o_flag) {
         EEPROM.writeFloat(4, ohms);
-        change_o_flag = 0;
+        change_o_flag = false;
       }
       // если есть изменения в настройках, записать в память
     }
     if (vape_state && !flag) { // если акум сел, а мы хотим подымить
       disp.clear();
-      disp_send(LOWB);
+      fn_disp_send(LOWB);
       delay(1000);
       vape_flag = 1;
     }
     //---------отработка нажатия кнопки парения-----------
   }
 
-  if (wake_up_flag) wake_puzzle();                   // вызвать функцию 5 нажатий для пробудки
+  if (wake_up_flag) fn_wake_puzzle();                   // вызвать функцию 5 нажатий для пробудки
 
-  if (millis() - wake_timer > sleep_timer * 1000) {  // если кнопки не нажимались дольше чем sleep_timer секунд
-    good_night();
+  if (millis() - wake_timer > Stg_sleep_timer * 1000) {  // если кнопки не нажимались дольше чем Stg_sleep_timer секунд
+    fn_good_night();
   }
 } // конец loop
 
 //------функция, вызываемая при выходе из сна (прерывание)------
-void wake_up() {
+void fn_wake_up() {
   digitalWrite(disp_vcc, HIGH);  // включить дисплей
   Timer1.disablePwm(mosfet);    // принудительно отключить койл
   digitalWrite(mosfet, LOW);    // принудительно отключить койл
@@ -451,7 +451,7 @@ void wake_up() {
 //------функция, вызываемая при выходе из сна (прерывание)------
 
 //------функция 5 нажатий для полного пробуждения------
-void wake_puzzle() {
+void fn_wake_puzzle() {
   detachInterrupt(0);    // отключить прерывание
   vape_btt_f = 0;
   boolean wake_status = 0;
@@ -463,13 +463,13 @@ void wake_puzzle() {
       vape_btt_f = 1;
       click_count++;
       switch (click_count) {
-        case 1: disp_send(V);
+        case 1: fn_disp_send(V);
           break;
-        case 2: disp_send(A);
+        case 2: fn_disp_send(A);
           break;
-        case 3: disp_send(P);
+        case 3: fn_disp_send(P);
           break;
-        case 4: disp_send(E);
+        case 4: fn_disp_send(E);
           break;
       }
       if (click_count > 4) {               // если 5 нажатий сделаны за 3 секунды
@@ -492,20 +492,20 @@ void wake_puzzle() {
     delay(100);
   } else {
     disp.clear();
-    good_night();     // спать
+    fn_good_night();     // спать
   }
 }
 //------функция 5 нажатий для полного пробуждения------
 
 //-------------функция ухода в сон----------------
-void good_night() {
-  disp_send(BYE);      // попрощаться
+void fn_good_night() {
+  fn_disp_send(BYE);      // попрощаться
   delay(500);
   disp.clear();
   Timer1.disablePwm(mosfet);    // принудительно отключить койл
   digitalWrite(mosfet, LOW);    // принудительно отключить койл
   delay(50);  
-  attachInterrupt(0, wake_up, FALLING);                   // подключить прерывание для пробуждения
+  attachInterrupt(0, fn_wake_up, FALLING);                   // подключить прерывание для пробуждения
   delay(50);  
   digitalWrite(disp_vcc, LOW);                            // подать 0 на все пины питания дисплея  
   LowPower.powerDown(SLEEP_FOREVER, ADC_OFF, BOD_OFF);    // спать. mode POWER_OFF, АЦП выкл
@@ -513,7 +513,7 @@ void good_night() {
 //-------------функция ухода в сон----------------
 
 //----------режим теста кнопок----------
-void service_mode() {
+void fn_service_mode() {
   if (set_state && !set_flag) {
     set_flag = 1;
     Serial.println("SET pressed");
@@ -550,19 +550,19 @@ void service_mode() {
 //----------режим теста кнопок----------
 
 // функция вывода моих слов на дисплей
-void disp_send(byte sym[]) {
+void fn_disp_send(byte sym[]) {
   for (int i = 0; i < 4; i++) {
     disp.set(SYM[sym[i]], 3 - i);
   }
 }
 
-void timerIsr()  //нужно для дисплея
+void fn_timerIsr()  //нужно для дисплея
 {
   disp.timerIsr();
 }
 
 // символы для дисплея
-void symbols() {
+void fn_symbols() {
 
   SYM[0] = 0xC0; //0
   SYM[1] = 0xF9; //1
@@ -615,21 +615,21 @@ void symbols() {
   SYM[46] = 0b11110110; //mid&high -
 }
 
-void calibration() {
+void fn_calibration() {
   //--------калибровка----------
   for (byte i = 0; i < 7; i++) EEPROM.writeInt(i, 0);          // чистим EEPROM для своих нужд
   my_vcc_const = 1.1;
-  Serial.print("Real VCC is: "); Serial.println(readVcc());     // общаемся с пользователем
+  Serial.print("Real VCC is: "); Serial.println(fn_readVcc());     // общаемся с пользователем
   Serial.println("Write your VCC (in millivolts)");
   while (Serial.available() == 0); int Vcc = Serial.parseInt(); // напряжение от пользователя
-  float real_const = (float)1.1 * Vcc / readVcc();              // расчёт константы
+  float real_const = (float)1.1 * Vcc / fn_readVcc();              // расчёт константы
   Serial.print("New voltage constant: "); Serial.println(real_const, 3);
   EEPROM.writeFloat(8, real_const);                             // запись в EEPROM
   while (1); // уйти в бесконечный цикл
   //------конец калибровки-------
 }
 
-long readVcc() { //функция чтения внутреннего опорного напряжения, универсальная (для всех ардуин)
+long fn_readVcc() { //функция чтения внутреннего опорного напряжения, универсальная (для всех ардуин)
 #if defined(__AVR_ATmega32U4__) || defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
   ADMUX = _BV(REFS0) | _BV(MUX4) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
 #elif defined (__AVR_ATtiny24__) || defined(__AVR_ATtiny44__) || defined(__AVR_ATtiny84__)
